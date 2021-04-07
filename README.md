@@ -96,6 +96,16 @@ Now open the `dr_link_transformed` layer in QGIS and make manual changes and add
 For new and modified links, set `data_source` to `'Manual'` so you can later see in the database which links originate from Digiroad directly and which not.
 This field could indicate other data sources too, such as OSM.
 
+When you have finished the link edits, create the node point layer and update link node references:
+
+```
+Rscript network_make_nodes.R data/sujuiko_nw_prepared.gpkg dr_link_transformed dr_node_transformed
+```
+
+*Note:* Digiroad includes nodes too (`ALKUSOLMU` and `LOPPUSOLMU`), but there are many links with missing node references, and some duplicate node ids too.
+And we would have to create nodes for manually created links anyway.
+This is way we create the node data set from scratch, purely based on the modified link geometries.
+
 **TODO:**
 
-- Make nodes based on the link ends
+- Output links and nodes as csv
