@@ -21,7 +21,7 @@ suppressMessages(library(sf))
 options('dplyr.summarise.inform' = FALSE)
 
 ROUTE_VER_STOP_FILE <- file.path('data', 'route_version_stops.csv')
-STOP_VER_FILE <- file.path('data', 'stop_versions_filtered.csv')
+STOP_VER_FILE <- file.path('data', 'stop_versions.csv')
 
 rtv_stops <- read_csv(
   ROUTE_VER_STOP_FILE,

@@ -10,15 +10,24 @@
 #' This way we do not have to deal with unnecessary stop data later.
 #'
 #' Example usage:
-#' > Rscript --vanilla stops_used_by_route_versions.R
+#' > Rscript --vanilla stops_used_by_route_versions.R data/stop_versions.csv data/route_version_stops.csv data/out/stop_versions_filtered.csv
 
 suppressMessages(library(dplyr))
 suppressMessages(library(tidyr))
 suppressMessages(library(readr))
 options('dplyr.summarise.inform' = FALSE)
 
-STOP_VER_FILE <- file.path('data', 'stop_versions_20200902_20201130.csv')
-ROUTE_VER_STOP_FILE <- file.path('data', 'route_version_stops.csv')
+args <- commandArgs(trailingOnly = TRUE)
+
+stopifnot(length(args) >= 3)
+
+STOP_VER_FILE <- args[1]
+ROUTE_VER_STOP_FILE <- args[2]
+OUT_FILE <- args[3]
+
+stopifnot(file.exists(STOP_VER_FILE))
+stopifnot(file.exists(ROUTE_VER_STOP_FILE))
+stopifnot(file.exists(OUT_FILE))
 
 all_stops <- read_csv(
   STOP_VER_FILE,
@@ -75,7 +84,7 @@ filt_stops <- all_stops %>%
 
 message(nrow(filt_stops), ' stop versions matching unique stops in route version stops')
 
-out_name <- file.path('data', 'stop_versions_filtered.csv')
+out_name <- OUT_FILE
 
 message('Writing filtered stops to ', out_name)
 write_csv(filt_stops, path = out_name, na = '')

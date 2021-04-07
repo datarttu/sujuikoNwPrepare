@@ -21,8 +21,8 @@ suppressMessages(library(readr))
 options('dplyr.summarise.inform' = FALSE)
 
 #' Note that ALL .rds files are read from here.
-SOURCE_DIR <- file.path('data', 'stops')
-TARGET_DIR <- file.path('data')
+SOURCE_DIR <- file.path('data', 'in', 'stops')
+TARGET_DIR <- file.path('data', 'out')
 
 in_files <- list.files(path = SOURCE_DIR, pattern = '.rds', full.names = TRUE)
 

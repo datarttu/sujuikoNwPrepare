@@ -11,7 +11,7 @@
 #' Example usage:
 #' > Rscript --vanilla download_stops_from_gtfs_feeds.R 2020-09-14 2020-09-30
 #'
-#' Arttu K / HSL 3/2021
+#' Arttu K 3/2021
 
 suppressMessages(library(readr))
 suppressMessages(library(curl))
@@ -24,7 +24,7 @@ START_DATE <- as.Date(args[1])
 END_DATE <- as.Date(args[2])
 stopifnot(START_DATE <= END_DATE)
 
-TARGET_DIR <- file.path('data', 'stops')
+TARGET_DIR <- file.path('data', 'in', 'stops')
 
 date_rng <- seq(START_DATE, END_DATE, 1)
 

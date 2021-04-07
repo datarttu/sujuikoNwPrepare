@@ -4,7 +4,7 @@
 #' NOTE: This script has side effects (saving to disk),
 #' review before running!
 #'
-#' This script reads all the .csv files from `data/routes/`,
+#' This script reads all the .csv files from `data/in/routes/`,
 #' constructs route versions with unique ids and validity ranges
 #' as well as their respective stop sequences,
 #' and saves them into `data/route_versions.csv` and `data/route_version_stops.csv`.
@@ -26,7 +26,7 @@ suppressMessages(library(readr))
 options('dplyr.summarise.inform' = FALSE)
 
 #' Note that ALL .csv files are read from here.
-SOURCE_DIR <- file.path('data', 'routes')
+SOURCE_DIR <- file.path('data', 'in', 'routes')
 TARGET_DIR <- file.path('data')
 
 in_files <- list.files(path = SOURCE_DIR, pattern = '.csv', full.names = TRUE)
