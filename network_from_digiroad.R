@@ -72,6 +72,7 @@ dupl_link_ids <- dr_out %>%
   pull(link_id)
 if (length(dupl_link_ids) > 0) {
   warning(sprintf('%d duplicate link ids: %s ...',
+                  length(dupl_link_ids),
                   paste(head(dupl_link_ids, n = 5), collapse = ', ')))
 }
 
@@ -81,6 +82,7 @@ na_oneways <- dr_out %>%
   pull(link_id)
 if (length(na_oneways) > 0) {
   warning(sprintf('%d links with NA oneway: %s ...',
+                  length(na_oneways),
                   paste(head(na_oneways, n = 5), collapse = ', ')))
 }
 
