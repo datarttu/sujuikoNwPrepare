@@ -106,6 +106,13 @@ Rscript network_make_nodes.R data/sujuiko_nw_prepared.gpkg dr_link_transformed d
 And we would have to create nodes for manually created links anyway.
 This is way we create the node data set from scratch, purely based on the modified link geometries.
 
-**TODO:**
+Review links and nodes in QGIS.
+If they are valid and ready for database import, output them as csv:
 
-- Output links and nodes as csv
+```
+Rscript network_save_csv.R data/sujuiko_nw_prepared.gpkg \
+  dr_link_transformed data/out/nw_link.csv \
+  dr_node_transformed data/out/nw_node.csv
+```
+
+`gzip` the files if you want, and copy them to a directory from which they can be read to the database.
