@@ -1,89 +1,87 @@
-#' WORK IN PROGRESS
+#' Reformat road links from Digiroad subset for manual changes and database import.
 #'
-#' Goals:
-#' - Fetch data from Digiroad WFS, constrained by KUNTAKOODI
+#' `DR_LINKS_SUBSET` linestring layer in `GPKG_PATH` Geopackage shall contain
+#' the original Digiroad `DR_LINKKI` fields and features that are to be included
+#' in the database import: delete unnecessary features first by hand.
 #'
-#' Now:
-#' - Uses local Digiroad dump from gpkg
+#' This script transforms the links for database import:
+#'
+#' - Unnecessary fields are dropped, field types are fixed and fields renamed.
+#' - `i_node` and `j_node` fields are created but left empty, nodes are created later.
+#' - `AJOSUUNTA` is recoded into boolean `oneway`, and if it says that traversing
+#'   is allowed opposite to the digitized direction (`AJOSUUNTA == 3`),
+#'   then the geometry is reversed.
+#' - `link_modes` is set to `"{bus}"` (for Postgres array input).
+#' - `data_source` is set to `Digiroad`.
+#' - `source_date` is set to the current date.
+#'
+#' The result is saved to the same geopackage as layer `RESULT_LINKS`.
+#'
+#' After this, modify the `RESULT_LINKS` features if needed, and mark new / modified
+#' links with `data_source = 'Manual'`.
+#'
+#' Usage:
+#'
+#' Rscript --vanilla network_from_digiroad.R <GPKG_PATH> <DR_LINKS_SUBSET> <RESULT_LINKS>
 
 library(sf)
 library(lwgeom)
 library(dplyr)
 
-# Koko alueen dump
-dr_all <- st_read(dsn = 'data/sujuiko_nw_prepared.gpkg',
-                  layer = 'dr_hkiespvankau_2021-04-01')
+args <- commandArgs(trailingOnly = TRUE)
 
-# Käsin tehty poiminta, josta puuttuu kenttiä
-dr_manual <- st_read(dsn = 'data/sujuiko_nw_prepared.gpkg',
-                     layer = 'sujuiko_digiroad_irrotus')
+stopifnot(length(args) >= 3)
 
-dr_filt <- dr_all %>%
-  filter(LINK_ID %in% dr_manual$LINK_ID)
+GPKG_PATH <- args[1]
+DR_LINKS_SUBSET <- args[2]
+RESULT_LINKS <- args[3]
 
-dr_filt$geom <- if_else(dr_filt$AJOSUUNTA == 3, st_reverse(dr_filt$geom), dr_filt$geom)
+stopifnot(file.exists(GPKG_PATH))
+avail_layers <- st_layers(GPKG_PATH)$name
+stopifnot(DR_LINKS_SUBSET %in% avail_layers)
+if (RESULT_LINKS %in% avail_layers) {
+  stop(sprintf('%s already in the gpkg layers: delete or rename it first', RESULT_LINKS))
+}
 
-# Muotoillaan sujuiko-kannalle sopivaksi
-dr_out <- dr_filt %>%
-  # select(link_id = LINK_ID,
-  #        i_node = ALKUSOLMU,
-  #        j_node = LOPPUSOLMU,
-  #        oneway = AJOSUUNTA,
-  #        link_label = TIENIMI_SU,
-  #        geom = geom) %>%
+dr_orig <- st_read(dsn = GPKG_PATH, layer = DR_LINKS_SUBSET)
+
+dr_out <- dr_orig %>%
   mutate(link_id = as.integer(LINK_ID),
-         i_node = as.integer(case_when(
-           AJOSUUNTA == 3 ~ LOPPUSOLMU,
-           TRUE ~ ALKUSOLMU
-         )),
-         j_node = as.integer(case_when(
-           AJOSUUNTA == 3 ~ ALKUSOLMU,
-           TRUE ~ LOPPUSOLMU
-         )),
+         i_node = NA_integer_,
+         j_node = NA_integer_,
          oneway = case_when(
            AJOSUUNTA == 2 ~ FALSE,
            AJOSUUNTA == 3 ~ TRUE,
            AJOSUUNTA == 4 ~ TRUE,
            TRUE ~ NA
          ),
+         link_modes = '{"bus"}',
          link_label = TIENIMI_SU,
          data_source = 'Digiroad',
-         source_date = '2021-04-01',
+         source_date = format(Sys.Date(), '%Y-%m-%d'),
          geom = if_else(AJOSUUNTA == 3, st_cast(st_reverse(geom), 'GEOMETRY'), st_cast(geom, 'GEOMETRY'))) %>%
-  select(link_id, i_node, j_node, oneway, link_label, data_source, source_date, geom) %>%
+  select(link_id, i_node, j_node, oneway, link_modes, link_label, data_source, source_date, geom) %>%
   mutate(geom = st_cast(geom, 'LINESTRING'))
 
-dr_out
-dr_out %>%
+#' Warn about invalid data
+dupl_link_ids <- dr_out %>%
   st_drop_geometry() %>%
-  group_by(oneway) %>%
-  summarise(n = n())
-
-# st_write(dr_out, dsn = 'data/sujuiko_nw_prepared.gpkg',
-#          layer = 'nw_links_prepared',
-#          delete_layer = TRUE)
-
-#' NODET
-#'
-#' - Muodostetaan linkkien alku- ja loppusolmuista
-#' - Noden pitää olla yksikäsitteinen, eli yhdessä sijainnissa yksi node_id
-#' - Jos näin ei ole, poistetaan kyseiset nodet, korvataan ne uudella nodella node_id 1 ...
-#' - Korvaukset pitää tehdä myös linkkeihin
-#' - Luodaan lisäksi nodet linkeille, joilta puuttuu alku- tai loppusolmu
-
-nodes <- dr_out %>%
-  mutate(geom = st_startpoint(geom)) %>%
-  select(node_id = i_node, geom) %>%
-  rbind(
-    dr_out %>%
-      mutate(geom = st_endpoint(geom)) %>%
-      select(node_id = j_node, geom)
-  ) %>%
-  distinct()
-
-duplicated_nodes <- nodes %>%
-  # st_drop_geometry() %>%
-  group_by(node_id) %>%
-  mutate(n = n()) %>%
+  group_by(link_id) %>%
+  summarise(n = n()) %>%
   filter(n > 1) %>%
-  arrange(-n, node_id)
+  pull(link_id)
+if (length(dupl_link_ids) > 0) {
+  warning(sprintf('%d duplicate link ids: %s ...',
+                  paste(head(dupl_link_ids, n = 5), collapse = ', ')))
+}
+
+na_oneways <- dr_out %>%
+  st_drop_geometry() %>%
+  filter(is.na(oneway)) %>%
+  pull(link_id)
+if (length(na_oneways) > 0) {
+  warning(sprintf('%d links with NA oneway: %s ...',
+                  paste(head(na_oneways, n = 5), collapse = ', ')))
+}
+
+st_write(dr_out, dsn = GPKG_PATH, layer = RESULT_LINKS)

@@ -85,7 +85,17 @@ You can use the WFS API or an older data dump available from the site.
 Unfortunately there is no automated way to get links used by transit vehicles directly from the API, so you have to do that work e.g. in QGIS.
 Save your link subset as linestring layer to `data/sujuiko_nw_prepared.gpkg`.
 
+Let us assume you saved the layer as `dr_linkki_extract`.
+Now run the script that transforms the data for manual changes before database import:
+
+```
+Rscript network_from_digiroad.R data/sujuiko_nw_prepared.gpkg dr_linkki_extract dr_link_transformed
+```
+
+Now open the `dr_link_transformed` layer in QGIS and make manual changes and additions if needed.
+For new and modified links, set `data_source` to `'Manual'` so you can later see in the database which links originate from Digiroad directly and which not.
+This field could indicate other data sources too, such as OSM.
+
 **TODO:**
 
-- Format Digiroad link data for manual edits before the database import
 - Make nodes based on the link ends
