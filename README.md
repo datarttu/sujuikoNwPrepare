@@ -47,18 +47,15 @@ Then merge the per-date stop datasets into one versioned dataset:
 Rscript stop_versions_from_gtfs_stops.R
 ```
 
-After you are ready with route versions, you can create a subset of stops only used by the route versions:
-
-```
-Rscript stops_used_by_route_versions.R data/stop_versions.csv \
-  data/route_version_stops.csv \
-  data/out/stop_versions_filtered.csv
-```
+Stops versions are saved to `data/stop_versions.csv`.
 
 ### Route versions
 
 Raw data files for route versions and their stop sequences are created from HSL public transport registry.
 They are not openly available.
+
+Make sure you have created `data/stop_versions.csv` first.
+It is needed for route versions, since route versions are cut whenever there is a change in a stop used by a route version.
 
 Make separate route version datasets into `data/route_versions.csv` and `data/route_version_stops.csv`:
 
