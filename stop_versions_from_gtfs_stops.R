@@ -105,13 +105,12 @@ versions_summary <- dt_versions %>%
 message('Number of stop entries by number of versions:\n',
         paste0(capture.output(versions_summary), collapse = '\n'))
 
-first_date <- min(dt_versions$version_start) %>%
-  as.character(format = '%Y%m%d')
-last_date <- max(dt_versions$version_end) %>%
-  as.character(format = '%Y%m%d')
-out_name <- file.path(TARGET_DIR,
-                      sprintf('stop_versions_%s_%s.csv', first_date, last_date))
+# first_date <- min(dt_versions$version_start) %>%
+#   as.character(format = '%Y%m%d')
+# last_date <- max(dt_versions$version_end) %>%
+#   as.character(format = '%Y%m%d')
+out_name <- file.path(TARGET_DIR, 'stop_versions.csv')
 
 message(sprintf('Writing stop versions to %s', out_name))
-write_csv(dt_versions, path = out_name, na = '')
+write_csv(dt_versions, file = out_name, na = '')
 
