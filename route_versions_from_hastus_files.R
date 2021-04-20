@@ -4,10 +4,17 @@
 #' NOTE: This script has side effects (saving to disk),
 #' review before running!
 #'
-#' This script reads all the .csv files from `data/in/routes/`,
-#' constructs route versions with unique ids and validity ranges
-#' as well as their respective stop sequences,
-#' and saves them into `data/route_versions.csv` and `data/route_version_stops.csv`.
+#' This script does the following:
+#'
+#' - Read all the .csv files from `data/in/routes/`
+#' - Read stop versions from `data/stop_versions.csv`
+#' - Construct route versions with unique ids and validity ranges
+#'   and their respective ordered stop lists
+#' - Split route versions whenever a stop version has change during the route
+#'   version validity time
+#' - Save route versions into `data/route_versions.csv`,
+#'   ordered stop lists by route version into `data/route_version_stops.csv`,
+#'   and stop versions used by the route versions into `data/stop_versions_used_by_route_versions.csv`
 #'
 #' The contents of a source file should look like this:
 #' route;direction;stop_id;stop_name;stop_seq;hastus;hastus_seq;last;segment;valStart;valEnd
@@ -25,7 +32,7 @@ suppressMessages(library(tidyr))
 suppressMessages(library(readr))
 options('dplyr.summarise.inform' = FALSE)
 
-#' Note that ALL .csv files are read from here.
+#' Note that ALL .csv files are read from this directory.
 SOURCE_DIR <- file.path('data', 'in', 'routes')
 TARGET_DIR <- file.path('data')
 
@@ -128,9 +135,9 @@ message(sprintf('%d route version stops in total',
 
 rv_out_name <- file.path('data', 'route_versions.csv')
 message('Writing route versions to ', rv_out_name)
-write_csv(route_versions, path = rv_out_name, na = '')
+write_csv(route_versions, file = rv_out_name, na = '')
 
 rvs_out_name <- file.path('data', 'route_version_stops.csv')
 message('Writing route version stops to ', rvs_out_name)
-write_csv(route_version_stops, path = rvs_out_name, na = '')
+write_csv(route_version_stops, file = rvs_out_name, na = '')
 
