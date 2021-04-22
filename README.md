@@ -27,7 +27,7 @@ mkdir data/out
 GTFS source data is in WGS84 (EPSG:4326) coordinates, Digiroad uses ETRS-TM35 (EPSG:3067).
 Output datasets for the database are saved in ETRS-TM35 coordinate system.
 
-### Stop versions
+### Stops
 
 This step aims to create temporal versions of transit stops, taking into account changes to stop locations, for example, that have taken place on a particular date.
 
@@ -48,6 +48,19 @@ Rscript stop_versions_from_gtfs_stops.R
 ```
 
 Stops versions are saved to `data/stop_versions.csv`.
+
+**NOTE:** For the time being, sujuikoDB uses a static set of stops.
+However, we keep the ability to produce stop versions for future use.
+The next step makes a static set of stops from the versioned stops by picking from each `stop_id` the version that is valid for the longest period of days:
+this way we get the "most representative" versions from each stop to the database.
+
+```
+Rscript stops_from_stop_versions.R
+```
+
+The result is saved to `data/all_stops.csv` and could be imported to the database as such.
+However, you may not want to import all stops to the db but only the ones that are really needed by the route versions you use.
+See the next steps below.
 
 ### Route versions
 
