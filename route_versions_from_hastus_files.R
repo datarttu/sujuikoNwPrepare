@@ -7,14 +7,13 @@
 #' This script does the following:
 #'
 #' - Read all the .csv files from `data/in/routes/`
-#' - Read stop versions from `data/stop_versions.csv`
-#' - Construct route versions with unique ids and validity ranges
+#' - Construct route versions with validity ranges
 #'   and their respective ordered stop lists
-#' - Split route versions whenever a stop version has change during the route
-#'   version validity time
-#' - Save route versions into `data/route_versions.csv`,
-#'   ordered stop lists by route version into `data/route_version_stops.csv`,
-#'   and stop versions used by the route versions into `data/stop_versions_used_by_route_versions.csv`
+#' - Read stops from `data/all_stops.csv`, drop stops that are not used by any route version,
+#'   populate `stop_place` field for stops that are used as Hastus places at least by one route version
+#' - Save route versions into `data/route_version.csv`,
+#'   ordered stop lists by route version into `data/stop_on_route.csv`,
+#'   and stops used by the route versions into `data/out/stop.csv`
 #'
 #' The contents of a source file should look like this:
 #' route;direction;stop_id;stop_name;stop_seq;hastus;hastus_seq;last;segment;valStart;valEnd
@@ -30,34 +29,40 @@
 suppressMessages(library(dplyr))
 suppressMessages(library(tidyr))
 suppressMessages(library(readr))
+suppressMessages(library(purrr))
+suppressMessages(library(stringr))
 options('dplyr.summarise.inform' = FALSE)
 
 #' Note that ALL .csv files are read from this directory.
 SOURCE_DIR <- file.path('data', 'in', 'routes')
 TARGET_DIR <- file.path('data')
+STOP_FILE <- file.path('data', 'all_stops.csv')
 
 in_files <- list.files(path = SOURCE_DIR, pattern = '.csv', full.names = TRUE)
+
+RV_OUT_NAME <- file.path('data', 'out', 'route_version.csv')
+RVS_OUT_NAME <- file.path('data', 'out', 'stop_on_route.csv')
+STOPS_OUT_NAME <- file.path('data', 'out', 'stop.csv')
 
 message(sprintf('%d input files from %s to %s',
                 length(in_files),
                 in_files[1],
                 tail(in_files, n = 1)))
 
-dt_raw <- lapply(in_files, read_delim,
-                 delim = ';',
-                 col_types = cols_only(
-                   route = col_character(),
-                   direction = col_integer(),
-                   stop_id = col_integer(),
-                   stop_seq = col_integer(),
-                   hastus = col_character(),
-                   valStart = col_date(format = '%Y-%m-%d'),
-                   valEnd = col_date(format = '%Y-%m-%d')
-                 ),
-                 # The source files are made on Windows, and the Hastus places
-                 # contain Scandinavian letters.
-                 locale = locale(encoding = 'Windows-1252')) %>%
-  bind_rows() %>%
+dt_raw <- map_dfr(in_files, read_delim,
+                  delim = ';',
+                  col_types = cols_only(
+                    route = col_character(),
+                    direction = col_integer(),
+                    stop_id = col_integer(),
+                    stop_seq = col_integer(),
+                    hastus = col_character(),
+                    valStart = col_date(format = '%Y-%m-%d'),
+                    valEnd = col_date(format = '%Y-%m-%d')
+                  ),
+                  # The source files are made on Windows, and the Hastus places
+                  # contain Scandinavian letters.
+                  locale = locale(encoding = 'Windows-1252')) %>%
   rename(hastus_place = hastus,
          val_start = valStart,
          val_end = valEnd)
@@ -133,11 +138,68 @@ route_version_stops <- dt %>%
 message(sprintf('%d route version stops in total',
                 nrow(route_version_stops)))
 
-rv_out_name <- file.path('data', 'route_versions.csv')
-message('Writing route versions to ', rv_out_name)
-write_csv(route_versions, file = rv_out_name, na = '')
+#' Read stops, keep only the ones used by route versions,
+#' set Hastus place values.
+#' NOTE: In case there happens to be different Hastus places for the same stop
+#'       (there shouldn't) use the one that occurs more often or happens to be the first.
+stops_all <- read_csv(file = STOP_FILE,
+                      col_types = cols(
+                        stop_id = col_double(),
+                        stop_radius_m = col_double(),
+                        stop_mode = col_character(),
+                        stop_code = col_character(),
+                        stop_name = col_character(),
+                        stop_place = col_logical(),
+                        parent_stop_id = col_double(),
+                        source_date = col_date(format = "%Y-%m-%d"),
+                        geom_text = col_character()
+                      ))
 
-rvs_out_name <- file.path('data', 'route_version_stops.csv')
-message('Writing route version stops to ', rvs_out_name)
-write_csv(route_version_stops, file = rvs_out_name, na = '')
+hastus_places <- route_version_stops %>%
+  filter(!is.na(hastus_place)) %>%
+  group_by(stop_id, hastus_place) %>%
+  summarise(n_stop_place = n()) %>%
+  group_by(stop_id) %>%
+  mutate(n_combos = n()) %>%
+  arrange(-n_combos) %>%
+  distinct(stop_id, .keep_all = TRUE) %>%
+  ungroup() %>%
+  select(stop_id, hastus_place)
 
+stops_out <- stops_all %>%
+  filter(stop_id %in% route_version_stops$stop_id) %>%
+  left_join(hastus_places, by = 'stop_id') %>%
+  mutate(stop_place = hastus_place) %>%
+  select(colnames(stops_all)) %>%
+  arrange(stop_id) %>%
+  print()
+
+#' Format into db import files
+
+rv_out <- route_versions %>%
+  mutate(route_ver_id = sprintf('%s_%d_%s_%s',
+                                route, direction,
+                                format(version_start, '%Y%m%d'),
+                                format(version_end, '%Y%m%d')),
+         valid_during = sprintf('[%s,%s]',
+                                format(version_start, '%Y-%m-%d'),
+                                format(version_end, '%Y-%m-%d')),
+         # TODO: For now we are only dealing with bus routes, change this later!!
+         route_mode = 'bus') %>%
+  select(route_ver_id, route, dir = direction, valid_during, route_mode)
+
+rvs_out <- route_version_stops %>%
+  mutate(route_ver_id = sprintf('%s_%d_%s_%s',
+                                route, direction,
+                                format(version_start, '%Y%m%d'),
+                                format(version_end, '%Y%m%d'))) %>%
+  select(route_ver_id, stop_seq, stop_id, active_place = hastus_place)
+
+message('Writing route versions to ', RV_OUT_NAME)
+write_csv(rv_out, file = RV_OUT_NAME, na = '')
+
+message('Writing route version stops to ', RVS_OUT_NAME)
+write_csv(rvs_out, file = RVS_OUT_NAME, na = '')
+
+message('Writing stops to ', STOPS_OUT_NAME)
+write_csv(stops_out, file = STOPS_OUT_NAME, na = '')
