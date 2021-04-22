@@ -44,6 +44,8 @@ stops_max_dur <- stver %>%
   mutate(version_duration = int_length(interval(version_start, version_end))) %>%
   group_by(stop_id) %>%
   filter(version_duration == max(version_duration)) %>%
+  filter(version_start == min(version_start)) %>%
+  ungroup() %>%
   print()
 
 #' NOTE: Defining default value for stop radius in meters here.
